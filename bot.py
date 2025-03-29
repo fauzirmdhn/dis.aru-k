@@ -19,8 +19,7 @@ class Client(commands.Bot):
         print(f'{self.user} successfully logged in')
 
         try:
-            guild = discord.Object(id=1265992956209266800)
-            slashsync = await self.tree.sync(guild=guild)
+            slashsync = await self.tree.sync()
             print(f"{len(slashsync)} synchronied")
 
         except Exception as e:
@@ -37,14 +36,12 @@ Intents.members = True
 
 client = Client(command_prefix='|', intents=Intents)
 
-GUILD_ID = discord.Object(id=1265992956209266800)
-
 # SLASH COMMANDS
-@client.tree.command(name="test", description="nodesc", guild=GUILD_ID)
+@client.tree.command(name="test", description="nodesc")
 async def test(interaction: discord.Interaction):
     await interaction.response.send_message("iya iya, ga usah panggil aku, berisik tau.")
 
-@client.tree.command(name="testargs", description="nodesc", guild=GUILD_ID)
+@client.tree.command(name="testargs", description="nodesc")
 async def testargs(interaction: discord.Interaction, arg1: str):
     await interaction.response.send_message(f"kamu ngomong \"{arg1}\" ya?")
 
