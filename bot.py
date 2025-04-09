@@ -60,47 +60,59 @@ async def testargs(interaction: discord.Interaction, arg1: str):
     await interaction.response.send_message(f"kamu ngomong \"{arg1}\" ya?")
 
 @client.tree.command(name="play", description="Adds a song to the queue and plays it")
-@app_commands.describe(query="The name of the song to play")
+@app_commands.describe(st_query="The name of the song to play")
 async def play(interaction: discord.Interaction, st_query: str):
-    await interaction.response.defer()
+    try:
+        await interaction.response.defer()
 
-    voice_channel = interaction.user.voice.channel
-    if not voice_channel:
-        await interaction.followup.send("You need to be in a voice channel to use this command.")
-        return
+        voice_channel = interaction.user.voice.channel
+        if not voice_channel:
+            await interaction.followup.send("You need to be in a voice channel to use this command.")
+            return
+        
+        
+        ydl_opts = {
+            "format": "bestaudio[abr<=96]/bestaudio",
+            "noplaylist": True,
+            "youtube_include_dash_manifest": False,
+            "youtube_include_hls_manifest": False,
+        }
+
+        query = "ytsearch1: " + st_query
+        result = await search_ytdlp_async(query, ydl_opts)
+        tracks = result.get("entries", [])
+
+        if not tracks:
+            await interaction.followup.send("No results found.")
+            return
     
-    voice_client = interaction.guild.voice_client
-    if voice_client is None:
-        voice_client = await voice_channel.connect()
-    elif voice_channel != voice_client.channel:
-        await voice_channel.move_to(voice_channel)
-
-    ydl_opts = {
-        "format": "bestaudio[abr<=96]/bestaudio",
-        "noplaylist": True,
-        "youtube_include_dash_manifest": False,
-        "youtube_include_hls_manifest": False,
-    }
-
-    query = "ytsearch1: " + st_query
-    result = await search_ytdlp_async(query, ydl_opts)
-    tracks = result.get("entries", [])
-
-    if not tracks:
-        await interaction.followup.send("No results found.")
-        return
+        first_track = tracks[0]
+        audio_url = first_track.get("url")
+        title = first_track.get("title", "Untitled")
     
-    first_track = tracks[0]
-    audio_url = first_track.get["url"]
-    title = first_track.get("title", "Untitled")
+        voice_client = interaction.guild.voice_client
+        if voice_client is None:
+            voice_client = await voice_channel.connect()
+        elif voice_channel != voice_client.channel:
+            await voice_client.move_to(voice_channel)
+        
+        ffmpeg_opts = {
+            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+            "options": "-vn -c:a libopus -b:a 96k",
+        }
 
-    ffmpeg_opts = {
-        "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-        "options": "-vn -c:a libopus -b:a 96k",
-    }
+        source = await discord.FFmpegOpusAudio.from_probe(
+            audio_url, 
+            **ffmpeg_opts, 
+            executable="bin\\ffmpeg\\ffmpeg.exe"
+        )
+        voice_client.play(source)
+        await interaction.followup.send(f"Now playing: {title}")
 
-    source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_opts, executable="bin\\ffmpeg\\ffmpeg.exe")
-    voice_client.play(source)
+    except Exception as e:
+        await interaction.followup.send(f"An error occurred: {str(e)}")
+        if voice_client and voice_client.is_connected():
+            await voice_client.disconnect()
 
 
 client.run(os.getenv("TOKEN"))
